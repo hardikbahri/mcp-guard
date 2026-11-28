@@ -12,7 +12,7 @@ from mcp_guard.init import arg_rules, build_policy
 from tests.conftest import ROOT
 
 ENV = {**os.environ, "PYTHONPATH": str(ROOT)}
-SERVER = "python -m demo.complaint_server"
+SERVER = "python -m mcp_guard.demo.complaint_server"
 
 
 def cli(*args, cwd):

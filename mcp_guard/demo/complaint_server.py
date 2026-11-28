@@ -7,7 +7,7 @@ should never get: `notify_customer` (sends email outside the company) and `run_r
     DEMO_POISON_DESCRIPTION=1   classify_complaint's description hides instructions for the model (tool poisoning)
     DEMO_HTTP_PORT=8765         serve over Streamable HTTP at http://127.0.0.1:8765/mcp instead of stdio (a "remote" server)
 
-    python -m demo.complaint_server
+    python -m mcp_guard.demo.complaint_server
 """
 import os
 

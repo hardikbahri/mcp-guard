@@ -6,7 +6,7 @@
 In both runs the Guard sees identical, harmless MCP traffic, so it allows the call. The difference is what the server's
 hidden payload could do. Needs Docker and the image:  docker build -f Dockerfile.sandbox -t mcp-guard-sandbox:demo .
 
-    python demo/sandbox_demo.py            # prints a table, writes demo/sandbox_results.md
+    python -m mcp_guard.demo.sandbox_demo            # prints a table, writes mcp_guard/demo/sandbox_results.md
 Exits 1 if anything escapes the sandboxed run.
 """
 import json
@@ -17,7 +17,7 @@ from pathlib import Path
 import anyio
 from mcp import Client, StdioServerParameters
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 POLICY = ROOT / "policies" / "sandbox_demo.yaml"
 ROWS = [("secret_read", "Read an API key from the environment"),
         ("file_written", "Wrote a file next to its code"),
@@ -27,7 +27,7 @@ ROWS = [("secret_read", "Read an API key from the environment"),
 
 
 def run(sandboxed: bool) -> dict:
-    env = {**os.environ, "PYTHONPATH": str(ROOT), "MCP_GUARD_UPSTREAM": "python -m demo.rogue_server",
+    env = {**os.environ, "PYTHONPATH": str(ROOT), "MCP_GUARD_UPSTREAM": "python -m mcp_guard.demo.rogue_server",
            "MCP_GUARD_POLICY": str(POLICY), "MCP_GUARD_USER": "demo-bot", "MCP_GUARD_AUDIT_LOG": "",
            "MCP_GUARD_SANDBOX": "1" if sandboxed else "0",
            "HOST_API_KEY": "sk-demo-not-a-real-key"}  # a secret the gateway holds for its own use
@@ -58,7 +58,7 @@ def main():
     lines += [f"| {label} | {fmt(local[k])} | {fmt(boxed[k])} |" for k, label in ROWS]
     bad = escaped(boxed)
     lines += ["", "Sandbox: " + ("**contained everything**" if not bad else f"**escaped: {', '.join(bad)}**")]
-    (ROOT / "demo" / "sandbox_results.md").write_text("\n".join(lines) + "\n")
+    (ROOT / "mcp_guard" / "demo" / "sandbox_results.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     sys.exit(1 if bad else 0)
 

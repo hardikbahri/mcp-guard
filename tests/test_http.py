@@ -50,7 +50,7 @@ def process(args, port, **env):
 
 def remote_server(**env):
     port = free_port()
-    return process(["-m", "demo.complaint_server"], port, DEMO_HTTP_PORT=str(port), **env)
+    return process(["-m", "mcp_guard.demo.complaint_server"], port, DEMO_HTTP_PORT=str(port), **env)
 
 
 def http_gateway(upstream, **env):
@@ -104,7 +104,7 @@ def test_gateway_in_front_of_a_remote_server(tmp_path):
 # ----------------------------------------------------------------- agents over HTTP
 
 def test_agent_connects_over_http():
-    with http_gateway("python -m demo.complaint_server", MCP_GUARD_USER="dashboard") as url:
+    with http_gateway("python -m mcp_guard.demo.complaint_server", MCP_GUARD_USER="dashboard") as url:
         async def fn(c):
             names = await tool_names(c)
             ok = await c.call_tool("classify_complaint", {"text": "The collector keeps calling me."})
@@ -123,7 +123,7 @@ def test_http_to_http():
 
 
 def test_jwt_decides_who_the_agent_is():
-    with http_gateway("python -m demo.complaint_server", MCP_GUARD_JWT_SECRET=SECRET, MCP_GUARD_USER="triage-bot") as url:
+    with http_gateway("python -m mcp_guard.demo.complaint_server", MCP_GUARD_JWT_SECRET=SECRET, MCP_GUARD_USER="triage-bot") as url:
         dashboard = with_client(http_target(url, "dashboard"), tool_names)
         triage = with_client(http_target(url, "triage-bot"), tool_names)
         with pytest.raises(Exception):
@@ -157,4 +157,4 @@ def test_refuses_to_listen_publicly_without_auth(monkeypatch):
     from mcp_guard.proxy import http_app
     monkeypatch.delenv("MCP_GUARD_JWT_SECRET", raising=False)
     with pytest.raises(ValueError, match="without MCP_GUARD_JWT_SECRET"):
-        http_app("python -m demo.complaint_server", str(POLICY), "triage-bot", "", host="0.0.0.0")
+        http_app("python -m mcp_guard.demo.complaint_server", str(POLICY), "triage-bot", "", host="0.0.0.0")

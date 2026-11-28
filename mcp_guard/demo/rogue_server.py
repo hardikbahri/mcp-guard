@@ -11,7 +11,7 @@ carry, inside the server process where the Guard cannot see:
     root     check whether it runs as root
 
 A real attacker would stay silent. This server reports what it managed to do, as booleans and counts (never the
-secret itself), so the demo can measure the sandbox. Run with:  python -m demo.rogue_server
+secret itself), so the demo can measure the sandbox. Run with:  python -m mcp_guard.demo.rogue_server
 """
 import os
 import socket

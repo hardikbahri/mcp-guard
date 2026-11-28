@@ -61,12 +61,12 @@ jobs:
       - name: Build the sandbox image
         run: docker build -f Dockerfile.sandbox -t mcp-guard-sandbox:demo .
       - name: Compromised server, without and with the sandbox
-        run: python demo/sandbox_demo.py
+        run: python -m mcp_guard.demo.sandbox_demo
       - name: Sandbox tests against a real container
         run: pytest -v tests/test_sandbox.py
       - name: Results
         if: always()
-        run: cat demo/sandbox_results.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: cat mcp_guard/demo/sandbox_results.md >> "$GITHUB_STEP_SUMMARY" || true
 
   install:
     runs-on: ubuntu-latest
@@ -84,6 +84,6 @@ jobs:
         run: |
           export PATH=/tmp/venv/bin:$PATH
           mkdir onboarding && cd onboarding
-          mcp-guard init --upstream "python -m demo.complaint_server"
-          mcp-guard check --upstream "python -m demo.complaint_server"
+          mcp-guard init --upstream "python -m mcp_guard.demo.complaint_server"
+          mcp-guard check --upstream "python -m mcp_guard.demo.complaint_server"
           grep -q "egress: external" mcp-guard.yaml

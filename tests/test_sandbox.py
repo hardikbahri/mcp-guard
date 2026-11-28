@@ -18,12 +18,12 @@ def flags(cmd):
 
 def test_command_locks_the_container_down():
     sb = sandbox.Sandbox(image="img:1")
-    cmd = sb.command(["python", "-m", "demo.rogue_server"])
+    cmd = sb.command(["python", "-m", "mcp_guard.demo.rogue_server"])
     s = flags(cmd)
     for f in ("--network none", "--cap-drop ALL", "--security-opt no-new-privileges", "--read-only",
               "--memory 256m", "--memory-swap 256m", "--pids-limit 64", "--user 65534:65534", "--rm -i"):
         assert f in s, f
-    assert cmd[-4:] == ["img:1", "python", "-m", "demo.rogue_server"]
+    assert cmd[-4:] == ["img:1", "python", "-m", "mcp_guard.demo.rogue_server"]
 
 
 def test_secrets_are_passed_by_name_only():
@@ -63,23 +63,23 @@ def test_unsandboxed_server_env_follows_the_allowlist():
 def test_proxy_wraps_the_upstream_in_docker(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/docker")
     monkeypatch.setenv("HOST_API_KEY", "sk-demo")
-    p = upstream_params("python -m demo.rogue_server", policy.load(DEMO_POLICY))
-    assert p.command == "docker" and "--network" in p.args and p.args[-3:] == ["python", "-m", "demo.rogue_server"]
+    p = upstream_params("python -m mcp_guard.demo.rogue_server", policy.load(DEMO_POLICY))
+    assert p.command == "docker" and "--network" in p.args and p.args[-3:] == ["python", "-m", "mcp_guard.demo.rogue_server"]
     assert "HOST_API_KEY" not in p.env
 
 
 def test_sandbox_can_be_switched_off_and_on(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/docker")
-    off = upstream_params("python -m demo.rogue_server", policy.load(DEMO_POLICY), force_sandbox="0")
+    off = upstream_params("python -m mcp_guard.demo.rogue_server", policy.load(DEMO_POLICY), force_sandbox="0")
     assert off.command != "docker"
     with pytest.raises(ValueError):  # forcing it on needs an image in the policy
-        upstream_params("python -m demo.complaint_server", policy.load(POLICY), force_sandbox="1")
+        upstream_params("python -m mcp_guard.demo.complaint_server", policy.load(POLICY), force_sandbox="1")
 
 
 def test_missing_docker_fails_loudly(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError, match="not installed"):
-        upstream_params("python -m demo.rogue_server", policy.load(DEMO_POLICY))
+        upstream_params("python -m mcp_guard.demo.rogue_server", policy.load(DEMO_POLICY))
 
 
 def _docker_ok():
@@ -92,7 +92,5 @@ def _docker_ok():
 
 @pytest.mark.skipif(not _docker_ok(), reason="needs Docker and the mcp-guard-sandbox:demo image")
 def test_rogue_server_is_contained():
-    import sys
-    sys.path.insert(0, str(ROOT / "demo"))
-    import sandbox_demo
+    from mcp_guard.demo import sandbox_demo
     assert sandbox_demo.escaped(sandbox_demo.run(True)) == []

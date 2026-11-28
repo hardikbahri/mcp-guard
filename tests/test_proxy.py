@@ -11,7 +11,7 @@ from tests.conftest import ROOT
 
 def run(user, fn, tmp_path, **env):
     params = StdioServerParameters(command=sys.executable, args=["-m", "mcp_guard.proxy"], cwd=str(ROOT), env={
-        **os.environ, "PYTHONPATH": str(ROOT), "MCP_GUARD_UPSTREAM": "python -m demo.complaint_server",
+        **os.environ, "PYTHONPATH": str(ROOT), "MCP_GUARD_UPSTREAM": "python -m mcp_guard.demo.complaint_server",
         "MCP_GUARD_USER": user, "MCP_GUARD_AUDIT_LOG": str(tmp_path / "audit.jsonl"), **env})
 
     async def go():

@@ -34,7 +34,7 @@ Every decision is written as one JSON line with Elastic Common Schema fields (`@
 ## Quickstart: put it in front of your MCP server
 
 ```bash
-pip install git+https://github.com/hardikbahri/mcp-guard
+pip install mcp-guard-gateway        # or: pip install git+https://github.com/hardikbahri/mcp-guard
 
 # 1. discover your server's tools and write a starter policy (mcp-guard.yaml)
 mcp-guard init --upstream "python -m your_package.mcp_server"      # or --upstream https://host/mcp
@@ -84,14 +84,15 @@ tool no role can reach, a misspelt setting, an external tool without PII redacti
 ```bash
 pip install -e ".[dev]"
 # stdio gateway: point any MCP client at this instead of the real server
-MCP_GUARD_UPSTREAM="python -m demo.complaint_server" MCP_GUARD_USER=triage-bot python -m mcp_guard.proxy
+MCP_GUARD_UPSTREAM="python -m mcp_guard.demo.complaint_server" MCP_GUARD_USER=triage-bot python -m mcp_guard.proxy
 # in front of a remote MCP server (Streamable HTTP)
 MCP_GUARD_UPSTREAM="https://tools.example.com/mcp" MCP_GUARD_UPSTREAM_TOKEN=... python -m mcp_guard.proxy
 # serve agents over HTTP at http://127.0.0.1:8090/mcp
-MCP_GUARD_UPSTREAM="python -m demo.complaint_server" MCP_GUARD_JWT_SECRET=... mcp-guard proxy --http --port 8090
+MCP_GUARD_UPSTREAM="python -m mcp_guard.demo.complaint_server" MCP_GUARD_JWT_SECRET=... mcp-guard proxy --http --port 8090
 # HTTP policy decision point (FastAPI), optional JWT identity via MCP_GUARD_JWT_SECRET
 mcp-guard api --port 8080
-# Docker
+# Docker (published image, or build it yourself)
+docker run -p 8080:8080 ghcr.io/hardikbahri/mcp-guard:latest
 docker build -t mcp-guard . && docker run -p 8080:8080 mcp-guard
 # tests and the attack suite
 pytest && python attacks/evaluate.py
@@ -139,7 +140,7 @@ sandbox:
   env: []            # e.g. [COMPLAINTOPS_DB_URL]
 ```
 
-`demo/sandbox_demo.py` runs the same compromised server (`demo/rogue_server.py`) through the gateway twice. Both calls
+`mcp_guard/demo/sandbox_demo.py` runs the same compromised server (`mcp_guard/demo/rogue_server.py`) through the gateway twice. Both calls
 are allowed, because the MCP traffic is harmless; the table shows what the hidden payload managed to do. CI runs it on
 every push and fails if anything escapes the sandbox. Result from CI (GitHub Actions runner):
 
@@ -152,7 +153,7 @@ every push and fails if anything escapes the sandbox. Result from CI (GitHub Act
 
 ```bash
 docker build -f Dockerfile.sandbox -t mcp-guard-sandbox:demo .
-python demo/sandbox_demo.py
+python -m mcp_guard.demo.sandbox_demo
 ```
 
 Without the sandbox, a policy can still limit what an unsandboxed server inherits with `upstream_env: [NAME, ...]`.

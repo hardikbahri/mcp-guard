@@ -1,11 +1,18 @@
 [project]
-name = "mcp-guard"
+name = "mcp-guard-gateway"
 version = "0.2.0"
 description = "Inline security gateway for AI agents and MCP tool servers: RBAC, prompt-injection and tool-misuse checks, DLP redaction, SIEM-ready audit logs."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 authors = [{name = "Hardik Bahri"}]
+keywords = ["mcp", "model context protocol", "ai agents", "llm security", "prompt injection", "guardrails", "owasp"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Intended Audience :: Developers",
+]
+
 dependencies = [
     "mcp>=2.3.0",
     "pyyaml>=6.0",
@@ -14,6 +21,10 @@ dependencies = [
     "pyjwt>=2.8",
 ]
 
+[project.urls]
+Homepage = "https://github.com/hardikbahri/mcp-guard"
+Source = "https://github.com/hardikbahri/mcp-guard"
+
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27"]
 
@@ -21,11 +32,11 @@ dev = ["pytest>=8", "httpx>=0.27"]
 mcp-guard = "mcp_guard.cli:main"
 
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["mcp_guard*", "demo*"]
+include = ["mcp_guard*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
