@@ -73,7 +73,14 @@ sandbox:
 
 `demo/sandbox_demo.py` runs the same compromised server (`demo/rogue_server.py`) through the gateway twice. Both calls
 are allowed, because the MCP traffic is harmless; the table shows what the hidden payload managed to do. CI runs it on
-every push and fails if anything escapes the sandbox.
+every push and fails if anything escapes the sandbox. Result from CI (GitHub Actions runner):
+
+| What the compromised server tried | Without sandbox | With sandbox |
+| --- | --- | --- |
+| Read an API key from the gateway's environment | yes | no |
+| Wrote a file next to its code | yes | no |
+| Opened a connection to the internet | yes | no |
+| Threads started (of 200) | 200 | 61 (process limit 64) |
 
 ```bash
 docker build -f Dockerfile.sandbox -t mcp-guard-sandbox:demo .
