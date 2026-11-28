@@ -62,6 +62,12 @@ mcp-guard check --upstream "python -m your_package.mcp_server"
 }
 ```
 
+### As an agent skill
+
+`skill/mcp-guard/` is a `SKILL.md` skill that walks a coding agent (Claude Code, Cursor, Copilot and others) through
+installing MCP Guard, generating and reviewing a policy with the user, and rewiring the client config, asking before
+each change.
+
 ### How configuration works
 
 | What | Where | Example |

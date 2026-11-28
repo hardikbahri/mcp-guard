@@ -6,3 +6,4 @@ audit.jsonl
 mcp_guard/demo/.rogue_write_probe
 build/
 *.egg-info/
+skill/*.zip
