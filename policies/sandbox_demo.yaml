@@ -1,0 +1,34 @@
+# Policy for the sandbox demo (demo/sandbox_demo.py): one harmless-looking tool from a compromised server.
+detectors:
+  injection_threshold: 3
+
+session:
+  max_calls: 10
+  max_violations_before_terminate: 3
+
+roles:
+  summarizer: [summarize_complaint]
+
+users:
+  demo-bot: [summarizer]
+
+tools:
+  summarize_complaint:
+    args:
+      text: {max_length: 5000}
+
+# The upstream server runs in a locked-down container (see mcp_guard/sandbox.py).
+# MCP_GUARD_SANDBOX=0 turns it off for the comparison run.
+sandbox:
+  enabled: true
+  image: mcp-guard-sandbox:demo
+  network: none
+  memory: 256m
+  cpus: "0.5"
+  pids_limit: 64
+  read_only: true
+  tmpfs: /tmp:rw,noexec,nosuid,size=16m
+  user: "65534:65534"
+  env: []            # HOST_API_KEY is deliberately not passed in
+
+pins: {}

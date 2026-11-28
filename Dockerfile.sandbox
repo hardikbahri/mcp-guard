@@ -1,0 +1,8 @@
+# Image the sandboxed tool server runs in. Holds only the server code and its MCP dependency.
+# Build:  docker build -f Dockerfile.sandbox -t mcp-guard-sandbox:demo .
+FROM python:3.12-slim
+RUN pip install --no-cache-dir "mcp==2.3.0"
+WORKDIR /app
+COPY demo ./demo
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+USER 65534:65534

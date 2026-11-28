@@ -10,6 +10,10 @@ Configuration (environment variables, so any MCP client can use it without code 
     MCP_GUARD_POLICY     policy YAML                                     (default: policies/complaintops.yaml)
     MCP_GUARD_USER       who the agent acts for; roles come from the policy's user directory
     MCP_GUARD_AUDIT_LOG  JSON Lines audit file                           (default: audit.jsonl; "" to disable)
+    MCP_GUARD_SANDBOX    "1" forces the policy's sandbox on, "0" forces it off (default: as the policy says)
+
+With a `sandbox:` section in the policy, the upstream command runs inside a locked-down container
+(see mcp_guard/sandbox.py); the command is then the one to run inside the image, e.g. "python -m demo.rogue_server".
 
     python -m mcp_guard.proxy
 """
@@ -26,6 +30,7 @@ from mcp.server.lowlevel.server import Server
 from mcp.server.stdio import stdio_server
 
 from mcp_guard import policy as policy_mod
+from mcp_guard import sandbox as sandbox_mod
 from mcp_guard.audit import AuditLog
 from mcp_guard.engine import Guard
 
@@ -88,13 +93,31 @@ def build_server(guard: Guard, session, upstream: Client) -> Server:
                   on_list_tools=list_tools, on_call_tool=call_tool)
 
 
-async def serve(upstream_cmd: str, policy_path: str, user: str, audit_path: str | None = None):
-    guard = Guard(policy_mod.load(policy_path), AuditLog(path=audit_path))
-    session = guard.open_session(user)
+def upstream_params(upstream_cmd: str, pol, force_sandbox: str | None = None) -> StdioServerParameters:
+    """How to start the real server: inside the sandbox when the policy (or MCP_GUARD_SANDBOX=1) says so, otherwise
+    as a local process that sees only the environment the policy allows."""
     argv = shlex.split(upstream_cmd)
+    raw = dict(pol.sandbox or {})
+    if force_sandbox == "1":
+        raw["enabled"] = True
+    elif force_sandbox == "0":
+        raw = {}
+    sb = sandbox_mod.from_config(raw)
+    if sb is not None:
+        if not sb.available():
+            raise RuntimeError(f"sandbox is enabled but '{sb.runtime}' is not installed")
+        cmd = sb.command(argv)
+        return StdioServerParameters(command=cmd[0], args=cmd[1:], env=sb.client_env())
     if argv and argv[0] in ("python", "python3"):
         argv[0] = sys.executable  # the upstream server runs in the same environment as the gateway
-    params = StdioServerParameters(command=argv[0], args=argv[1:], env={**os.environ})
+    return StdioServerParameters(command=argv[0], args=argv[1:], env=sandbox_mod.upstream_env(pol.upstream_env))
+
+
+async def serve(upstream_cmd: str, policy_path: str, user: str, audit_path: str | None = None):
+    pol = policy_mod.load(policy_path)
+    guard = Guard(pol, AuditLog(path=audit_path))
+    session = guard.open_session(user)
+    params = upstream_params(upstream_cmd, pol, os.environ.get("MCP_GUARD_SANDBOX"))
     async with Client(params) as upstream:
         server = build_server(guard, session, upstream)
         async with stdio_server() as (read, write):

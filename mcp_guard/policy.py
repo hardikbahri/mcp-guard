@@ -44,6 +44,8 @@ class Policy:
     max_calls_per_session: int = 50
     max_violations_before_terminate: int = 3
     pins: dict[str, str] = field(default_factory=dict)
+    sandbox: dict | None = None              # raw `sandbox:` section, see mcp_guard/sandbox.py
+    upstream_env: list[str] | None = None    # env vars an unsandboxed server may see; None = inherit everything
 
     def roles_of(self, user: str, claimed: list[str] | None = None) -> set[str]:
         """Roles come from the policy's user directory. Roles a caller merely claims are honoured only if the policy
@@ -77,6 +79,8 @@ def load(path: str | Path) -> Policy:
         max_calls_per_session=s.get("max_calls", 50),
         max_violations_before_terminate=s.get("max_violations_before_terminate", 3),
         pins=raw.get("pins") or {},
+        sandbox=raw.get("sandbox"),
+        upstream_env=raw.get("upstream_env"),
     )
 
 

@@ -23,6 +23,7 @@ Built in front of the [ComplaintOps](https://github.com/hardikbahri/complaintops
 | Poisoned tool descriptions, tool definitions changed after review (sha256 pins) | ASI04 Supply Chain | tool hidden |
 | PII (email, phone, card with Luhn, SSN, Aadhaar, PAN, IBAN) and secrets leaving the boundary or entering model context | ASI03 / DLP | redacted |
 | Session call budget exceeded, repeated violations | ASI08 Cascading Failures / ASI10 Rogue Agents | session terminated |
+| A compromised tool server acting inside its own process (reading secrets, writing files, calling out, exhausting resources) | ASI05 Unexpected Code Execution / ASI04 Supply Chain | contained by the sandbox |
 
 Every decision is written as one JSON line with Elastic Common Schema fields (`@timestamp`, `event.*`, `user.*`,
 `rule.*`) so a log forwarder can ship it to Elastic, Splunk or Microsoft Sentinel. Values that were redacted are never logged.
@@ -43,11 +44,43 @@ pytest && python attacks/evaluate.py
 
 With `MCP_GUARD_JWT_SECRET` set, the API takes the user from the token's `sub` (claimed roles are kept only where the policy grants them), a session can only be used with a token for the same user, and `/v1/audit` needs a token with the `audit` scope.
 
-CI runs the unit, API, proxy and attack-suite tests on Python 3.11 and 3.12, then builds the Docker image and checks that the container serves the API as a non-root user and blocks an out-of-role call.
+CI runs the unit, API, proxy and attack-suite tests on Python 3.11 and 3.12, then builds the Docker image and checks that the container serves the API as a non-root user and blocks an out-of-role call. A third job builds the sandbox image and runs the compromised-server demo against a real container.
 
 With ComplaintOps: `ComplaintAgent(server_module="mcp_guard.proxy")` with `MCP_GUARD_UPSTREAM="python -m complaintops.mcp_server"`.
 In tests, a poisoned similar-complaint result reaches the agent's LLM without the gateway; through it, the planted
 instruction and the personal data are removed.
+
+## Sandbox
+
+The checks above see what crosses the MCP boundary. They cannot see what a tool server does inside its own process: a
+poisoned package or a bad update can read the host's API keys, write files or call out to the internet while its MCP
+traffic stays perfectly clean. With a `sandbox:` section in the policy, the gateway starts the tool server in a
+locked-down container instead of as a local process:
+
+- no network (`--network none`), read-only filesystem, all Linux capabilities dropped, `no-new-privileges`
+- non-root user, capped memory, CPU and process count, a small `noexec` `/tmp`
+- only the environment variables the policy names, passed by name so values never appear on a command line
+
+```yaml
+sandbox:
+  enabled: true
+  image: mcp-guard-sandbox:demo
+  network: none
+  memory: 256m
+  pids_limit: 64
+  env: []            # e.g. [COMPLAINTOPS_DB_URL]
+```
+
+`demo/sandbox_demo.py` runs the same compromised server (`demo/rogue_server.py`) through the gateway twice. Both calls
+are allowed, because the MCP traffic is harmless; the table shows what the hidden payload managed to do. CI runs it on
+every push and fails if anything escapes the sandbox.
+
+```bash
+docker build -f Dockerfile.sandbox -t mcp-guard-sandbox:demo .
+python demo/sandbox_demo.py
+```
+
+Without the sandbox, a policy can still limit what an unsandboxed server inherits with `upstream_env: [NAME, ...]`.
 
 ## Limits
 
