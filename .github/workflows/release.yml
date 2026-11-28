@@ -1,10 +1,10 @@
 name: Release
 
-# Publishing a GitHub release (tag vX.Y.Z) builds the package and uploads it to PyPI as mcp-guard-gateway.
-# Uses PyPI trusted publishing: no API token is stored in the repo.
+# Pushing a version tag (vX.Y.Z) builds the package, uploads it to PyPI as mcp-guard-gateway and creates the
+# GitHub release. Uses PyPI trusted publishing: no API token is stored in the repo.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
 
 jobs:
   build:
@@ -36,3 +36,26 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: MCP Guard ${{ github.ref_name }}
+          files: dist/*
+          body: |
+            Security gateway for AI agents and MCP tool servers.
+
+            **Install:** `pip install mcp-guard-gateway` or `docker pull ghcr.io/hardikbahri/mcp-guard:${{ github.ref_name }}`
+
+            **Quickstart:** `mcp-guard init --upstream "<your MCP server>"`, review `mcp-guard.yaml`
+            ([policy reference](https://github.com/hardikbahri/mcp-guard/blob/main/docs/policy.md)), `mcp-guard check`,
+            then point your MCP client at `mcp-guard proxy`.

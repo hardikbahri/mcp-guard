@@ -1,11 +1,10 @@
 name: Docker image
 
-# Publishes ghcr.io/hardikbahri/mcp-guard: `latest` from main, and a version tag for each release.
+# Publishes ghcr.io/hardikbahri/mcp-guard: `latest` from main, and a version tag for each vX.Y.Z tag.
 on:
   push:
     branches: [main]
-  release:
-    types: [published]
+    tags: ["v*"]
 
 permissions:
   contents: read
