@@ -1,0 +1,66 @@
+# Demo copy of policies/complaintops.yaml for `python -m mcp_guard.demo.live` (4 violations end a session).
+# MCP Guard policy for the ComplaintOps tool server (https://github.com/hardikbahri/complaintops).
+# Default deny: a tool missing from `tools`, or not granted through `roles`, is hidden from the agent and blocked.
+
+detectors:
+  injection_threshold: 3        # sum of rule weights (see mcp_guard/detectors.py) at which text counts as an injection
+
+session:
+  max_calls: 40                 # a triage run makes at most 3 calls; far more means a loop (ASI08)
+  max_violations_before_terminate: 4
+
+roles:
+  triage-agent:   [classify_complaint, search_similar_complaints, flag_for_review]
+  readonly-agent: [classify_complaint, search_similar_complaints]
+  support-agent:  [classify_complaint, notify_customer]
+  analyst:        [run_report]
+
+users:                           # who the agent is acting for -> roles it may use
+  triage-bot:   [triage-agent]
+  dashboard:    [readonly-agent]
+  support-bot:  [support-agent]
+  analyst-bot:  [analyst]
+
+tools:
+  classify_complaint:
+    args:
+      text: {max_length: 20000}
+    on_injection_in_args: alert   # complaints are untrusted text by design: classify them, but raise an alert
+    max_calls_per_session: 5
+
+  search_similar_complaints:
+    args:
+      text: {max_length: 20000}
+      k: {min: 1, max: 10}
+      product: {max_length: 200}
+    on_injection_in_args: alert
+    on_injection_in_result: redact  # past complaints are stored text: planted instructions are cut before the model sees them
+    redact_pii_in_result: true
+    max_calls_per_session: 5
+
+  flag_for_review:
+    args:
+      text: {max_length: 20000}
+      reason: {max_length: 500}
+      predicted_label: {max_length: 300}
+      confidence: {min: 0, max: 1}
+      summary: {max_length: 2000}
+      suggestions: {}
+    on_injection_in_args: alert
+    max_calls_per_session: 2
+
+  notify_customer:              # sends email outside the company: personal data in the message is redacted (DLP)
+    egress: external
+    args:
+      email: {max_length: 254, allow_pii: true}
+      message: {max_length: 2000}
+    redact_pii_in_args: true
+    on_injection_in_args: block
+    max_calls_per_session: 1
+
+  run_report:
+    args:
+      query: {max_length: 2000}
+    on_injection_in_args: block
+
+pins: {}                         # tool -> sha256 from `mcp-guard pin`; a changed definition is hidden (ASI04)

@@ -31,6 +31,18 @@ Built in front of the [ComplaintOps](https://github.com/hardikbahri/complaintops
 Every decision is written as one JSON line with Elastic Common Schema fields (`@timestamp`, `event.*`, `user.*`,
 `rule.*`) so a log forwarder can ship it to Elastic, Splunk or Microsoft Sentinel. Values that were redacted are never logged.
 
+## Live demo (2 minutes, no API key)
+
+```bash
+pip install mcp-guard-gateway
+python -m mcp_guard.demo.live          # press Enter between scenes
+```
+
+The same attacks against a demo complaint-triage tool server, first directly and then through MCP Guard: an indirect
+prompt injection with personal data in a search result, an agent tricked into emailing data out, a shell-injection
+payload, an abusive argument, repeated violations, and a rug pull (a tool rewritten after review). It ends with the
+audit log. The script plays the agent, so every run is identical.
+
 ## Quickstart: put it in front of your MCP server
 
 ```bash
