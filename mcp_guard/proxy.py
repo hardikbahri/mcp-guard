@@ -243,7 +243,9 @@ def main(argv: list[str] | None = None):
     upstream = os.environ.get("MCP_GUARD_UPSTREAM")
     if not upstream:
         sys.exit("set MCP_GUARD_UPSTREAM to the command that starts the real MCP server, or its URL")
-    policy_path = os.environ.get("MCP_GUARD_POLICY", str(DEFAULT_POLICY))
+    policy_path = str(policy_mod.default_path())
+    if not Path(policy_path).exists():
+        sys.exit(f"no policy at {policy_path}: create one with `mcp-guard init --upstream ...` or set MCP_GUARD_POLICY")
     user = os.environ.get("MCP_GUARD_USER", "anonymous")
     audit = os.environ.get("MCP_GUARD_AUDIT_LOG")
     if a.http:

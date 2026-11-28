@@ -12,4 +12,4 @@ EXPOSE 8080
 HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')"
 # HTTP policy decision point by default; `docker run -i ... mcp-guard proxy` runs the stdio gateway instead
 ENTRYPOINT ["mcp-guard"]
-CMD ["api", "--port", "8080"]
+CMD ["api", "--host", "0.0.0.0", "--port", "8080"]

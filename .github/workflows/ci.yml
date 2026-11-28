@@ -67,3 +67,23 @@ jobs:
       - name: Results
         if: always()
         run: cat demo/sandbox_results.md >> "$GITHUB_STEP_SUMMARY" || true
+
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the package into a clean environment
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install .
+      - name: Quickstart outside the repo
+        working-directory: /tmp
+        run: |
+          export PATH=/tmp/venv/bin:$PATH
+          mkdir onboarding && cd onboarding
+          mcp-guard init --upstream "python -m demo.complaint_server"
+          mcp-guard check --upstream "python -m demo.complaint_server"
+          grep -q "egress: external" mcp-guard.yaml

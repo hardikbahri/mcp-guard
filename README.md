@@ -31,7 +31,55 @@ Built in front of the [ComplaintOps](https://github.com/hardikbahri/complaintops
 Every decision is written as one JSON line with Elastic Common Schema fields (`@timestamp`, `event.*`, `user.*`,
 `rule.*`) so a log forwarder can ship it to Elastic, Splunk or Microsoft Sentinel. Values that were redacted are never logged.
 
-## Run it
+## Quickstart: put it in front of your MCP server
+
+```bash
+pip install git+https://github.com/hardikbahri/mcp-guard
+
+# 1. discover your server's tools and write a starter policy (mcp-guard.yaml)
+mcp-guard init --upstream "python -m your_package.mcp_server"      # or --upstream https://host/mcp
+
+# 2. review it: split tools into roles, tighten limits, read the REVIEW comments; then validate
+mcp-guard check --upstream "python -m your_package.mcp_server"
+
+# 3. point your MCP client at the gateway instead of the server (init prints this snippet)
+```
+
+```json
+{
+  "mcpServers": {
+    "guarded-tools": {
+      "command": "mcp-guard",
+      "args": ["proxy"],
+      "env": {
+        "MCP_GUARD_UPSTREAM": "python -m your_package.mcp_server",
+        "MCP_GUARD_POLICY": "/path/to/mcp-guard.yaml",
+        "MCP_GUARD_USER": "my-agent",
+        "MCP_GUARD_AUDIT_LOG": "/path/to/audit.jsonl"
+      }
+    }
+  }
+}
+```
+
+### How configuration works
+
+| What | Where | Example |
+| --- | --- | --- |
+| **Rules**: roles, users, per-tool argument limits, what to do on injection, PII, budgets, pins, sandbox | the policy YAML (`mcp-guard.yaml`) | `notify_customer: {egress: external, redact_pii_in_args: true}` |
+| **Wiring**: which server, which policy, who the agent is, where the audit log goes | `MCP_GUARD_*` environment variables, or flags on `mcp-guard proxy` (flags win) | `mcp-guard proxy --upstream ... --policy ... --user my-agent` |
+| **Secrets**: JWT secret, upstream token | environment variables only, never the YAML | `MCP_GUARD_JWT_SECRET`, `MCP_GUARD_UPSTREAM_TOKEN` |
+
+`init` builds the starter policy from the server's own tool schemas: string limits from `maxLength`, number ranges from
+`minimum`/`maximum`, `enum`s kept. Tools whose names suggest sending data out (email, notify, post, upload, webhook)
+are marked `egress: external` with PII redaction, and the recipient field is allowed through. Tools whose names
+suggest destructive or code-running actions (delete, exec, run, write) get a one-call budget and a REVIEW comment.
+Every tool is pinned, so `mcp-guard check --upstream ...` reports a tool whose description or schema has changed.
+
+`check` explains mistakes in plain language: a role granting a tool with no rules, a user with an undefined role, a
+tool no role can reach, a misspelt setting, an external tool without PII redaction.
+
+## Run it (this repo)
 
 ```bash
 pip install -e ".[dev]"

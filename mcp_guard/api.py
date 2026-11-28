@@ -20,7 +20,7 @@ from mcp_guard import policy as policy_mod
 from mcp_guard.audit import AuditLog
 from mcp_guard.engine import Decision, Guard, Session
 
-POLICY = os.environ.get("MCP_GUARD_POLICY", str(Path(__file__).resolve().parent.parent / "policies" / "complaintops.yaml"))
+POLICY = str(policy_mod.default_path())
 guard = Guard(policy_mod.load(POLICY), AuditLog())
 sessions: dict[str, Session] = {}
 app = FastAPI(title="MCP Guard", version="0.1.0",

@@ -91,3 +91,72 @@ def tool_fingerprint(name: str, description: str | None, input_schema: dict | No
     (a "rug pull"), so the pinned version no longer applies."""
     blob = json.dumps({"name": name, "description": description or "", "schema": input_schema or {}}, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()
+
+
+TOP_LEVEL = {"detectors", "session", "roles", "users", "tools", "pins", "sandbox", "upstream_env",
+             "upstream_allowed_hosts"}
+
+
+def default_path() -> Path:
+    """MCP_GUARD_POLICY, else ./mcp-guard.yaml (what `mcp-guard init` writes), else the bundled ComplaintOps policy."""
+    import os
+    if os.environ.get("MCP_GUARD_POLICY"):
+        return Path(os.environ["MCP_GUARD_POLICY"])
+    local = Path.cwd() / "mcp-guard.yaml"
+    if local.exists():
+        return local
+    return Path(__file__).resolve().parent.parent / "policies" / "complaintops.yaml"
+
+
+def check(path: str | Path) -> tuple[list[str], list[str]]:
+    """Validate a policy file. Returns (errors, warnings) in plain language; errors mean the gateway would refuse it
+    or behave differently from what the file seems to say."""
+    errors, warnings = [], []
+    try:
+        raw = yaml.safe_load(Path(path).read_text()) or {}
+    except FileNotFoundError:
+        return [f"{path}: file not found (create one with `mcp-guard init`)"], []
+    except yaml.YAMLError as e:
+        return [f"{path}: not valid YAML: {e}"], []
+    if not isinstance(raw, dict):
+        return [f"{path}: the top level must be a mapping (detectors:, roles:, users:, tools: ...)"], []
+    for k in raw:
+        if k not in TOP_LEVEL:
+            warnings.append(f"unknown top-level key '{k}' is ignored (known: {', '.join(sorted(TOP_LEVEL))})")
+    try:
+        pol = load(path)
+    except TypeError as e:
+        bad = str(e).split("got an unexpected keyword argument")[-1].strip(" '")
+        return errors + [f"unknown setting '{bad}' (tool settings: {', '.join(ToolPolicy.__dataclass_fields__)}; "
+                         f"argument settings: {', '.join(ArgRule.__dataclass_fields__)})"], warnings
+    except (ValueError, AttributeError) as e:
+        return errors + [str(e)], warnings
+
+    granted = set()
+    for role, tools in pol.roles.items():
+        for t in sorted(tools - set(pol.tools)):
+            errors.append(f"role '{role}' grants '{t}', which has no entry under tools: it will stay blocked")
+        granted |= tools
+    for user, roles in pol.users.items():
+        for r in sorted(roles - set(pol.roles)):
+            errors.append(f"user '{user}' has role '{r}', which is not defined under roles")
+    if not pol.users:
+        warnings.append("no users: every agent will get no tools (add one under users:)")
+    for name, t in pol.tools.items():
+        if name not in granted:
+            warnings.append(f"tool '{name}' is not granted to any role, so no agent can use it")
+        if t.egress == "external" and t.redact_pii_in_args is False:
+            warnings.append(f"tool '{name}' sends data out (egress: external) but redact_pii_in_args is false")
+        if t.on_injection_in_result == "allow":
+            warnings.append(f"tool '{name}' passes prompt injections in its results to the model (on_injection_in_result: allow)")
+        if t.allow_unknown_args:
+            warnings.append(f"tool '{name}' accepts arguments the policy does not list (allow_unknown_args: true)")
+        if pol.pins and name not in pol.pins:
+            warnings.append(f"tool '{name}' has no pin, so a change to it would go unnoticed (run `mcp-guard pin`)")
+    if pol.sandbox:
+        from mcp_guard import sandbox
+        try:
+            sandbox.from_config(pol.sandbox)
+        except (ValueError, TypeError) as e:
+            errors.append(f"sandbox: {e}")
+    return errors, warnings
