@@ -27,6 +27,18 @@ Source and docs: https://github.com/hardikbahri/mcp-guard
   without telling the user what it exposes and getting a yes.
 - The generated policy is a starting point. Walk the user through it; do not present it as finished.
 
+## If you cannot ask the user
+
+When nobody is there to answer (an unattended run, a script, CI), lock down rather than open up:
+
+- Make only changes that tighten: leave tools flagged REVIEW and tools marked `egress: external` out of the role unless
+  the user's request named them (`mcp-guard init --upstream "..." --exclude a,b` does this without editing YAML). Keep
+  injection and PII checks on. Never loosen anything.
+- Do not edit the client config. Write the new entry to `mcp-client-config.guarded.json` next to it and say what to
+  replace.
+- Write `mcp-guard-review.md` listing every decision you could not make (for example "notify_customer left out; add it
+  to the role if this agent should email customers") and finish by pointing the user to it.
+
 ## Steps
 
 ### 1. Install
@@ -58,7 +70,8 @@ This connects to the server, reads its tools and writes `mcp-guard.yaml`. It pri
 
 ### 4. Review the policy with the user
 
-Open `mcp-guard.yaml` and go through it together (full key reference in `reference/policy.md`):
+Open `mcp-guard.yaml` and go through it together (every setting is explained in `reference/policy.md`, the same file as
+`docs/policy.md` in the repository):
 
 1. **Roles.** `init` grants every tool to one role, `agent`. Ask what this agent actually needs and move other tools
    into separate roles or remove them. Least privilege is the main protection.

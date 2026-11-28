@@ -39,7 +39,8 @@ pip install mcp-guard-gateway        # or: pip install git+https://github.com/ha
 # 1. discover your server's tools and write a starter policy (mcp-guard.yaml)
 mcp-guard init --upstream "python -m your_package.mcp_server"      # or --upstream https://host/mcp
 
-# 2. review it: split tools into roles, tighten limits, read the REVIEW comments; then validate
+# 2. review it (every setting: docs/policy.md): split tools into roles, tighten limits, read the REVIEW comments
+#    leave tools out up front with --exclude run_report,notify_customer; then validate
 mcp-guard check --upstream "python -m your_package.mcp_server"
 
 # 3. point your MCP client at the gateway instead of the server (init prints this snippet)
@@ -69,6 +70,9 @@ installing MCP Guard, generating and reviewing a policy with the user, and rewir
 each change.
 
 ### How configuration works
+
+The full policy reference, with every setting, action and environment variable, is [docs/policy.md](docs/policy.md).
+
 
 | What | Where | Example |
 | --- | --- | --- |

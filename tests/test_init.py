@@ -88,3 +88,17 @@ def test_check_explains_mistakes(tmp_path):
     errors, _ = policy.check(p)
     assert errors and "unknown setting 'maxlen'" in errors[0]
     assert policy.check(tmp_path / "nope.yaml")[0][0].endswith("file not found (create one with `mcp-guard init`)")
+
+
+def test_exclude_leaves_tools_out(tmp_path):
+    r = cli("init", "--upstream", SERVER, "--exclude", "notify_customer,run_report", cwd=tmp_path)
+    assert r.returncode == 0 and "(excluded: notify_customer, run_report)" in r.stdout, r.stderr
+    pol = policy.load(tmp_path / "mcp-guard.yaml")
+    assert set(pol.tools) == set(pol.pins) == {"classify_complaint", "search_similar_complaints", "flag_for_review"}
+    assert policy.check(tmp_path / "mcp-guard.yaml") == ([], [])
+    bad = cli("init", "--upstream", SERVER, "--exclude", "nope", "--force", cwd=tmp_path)
+    assert bad.returncode == 1 and "does not offer: nope" in bad.stderr
+
+
+def test_skill_reference_matches_the_docs():
+    assert (ROOT / "skill" / "mcp-guard" / "reference" / "policy.md").read_text() == (ROOT / "docs" / "policy.md").read_text()

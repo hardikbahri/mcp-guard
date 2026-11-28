@@ -1,6 +1,6 @@
 """Command line.
 
-    mcp-guard init  --upstream "python -m my_server"     discover the tools, write mcp-guard.yaml, print client config
+    mcp-guard init  --upstream "python -m my_server" [--exclude a,b]   write mcp-guard.yaml, print client config
     mcp-guard check [mcp-guard.yaml] [--upstream ...]     validate a policy (and compare its pins with the live server)
     mcp-guard pin   "python -m my_server"                 print tool fingerprints for the policy's `pins:`
     mcp-guard proxy [--upstream ...] [--policy ...] [--user ...] [--http --port 8090]   run the gateway
@@ -31,8 +31,16 @@ def cmd_init(a) -> int:
     if not tools:
         print("the server listed no tools", file=sys.stderr)
         return 1
-    out.write_text(build_policy(tools, a.role, a.user))
-    print(f"wrote {out} with {len(tools)} tools: {', '.join(t['name'] for t in tools)}\n")
+    exclude = [x.strip() for x in (a.exclude or "").split(",") if x.strip()]
+    try:
+        text = build_policy(tools, a.role, a.user, exclude)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    out.write_text(text)
+    tools = [t for t in tools if t["name"] not in exclude]
+    print(f"wrote {out} with {len(tools)} tools: {', '.join(t['name'] for t in tools)}"
+          + (f" (excluded: {', '.join(exclude)})" if exclude else "") + "\n")
     print("Review it (roles, limits, the REVIEW comments), then check it:\n")
     print(f"    mcp-guard check {out}\n")
     print("Point your MCP client at the gateway instead of the server, e.g. in Claude Desktop or Cursor:\n")
@@ -97,6 +105,7 @@ def main(argv: list[str] | None = None):
     i.add_argument("--output", "-o", default="mcp-guard.yaml")
     i.add_argument("--role", default="agent")
     i.add_argument("--user", default="my-agent")
+    i.add_argument("--exclude", help="comma-separated tools to leave out (hidden and blocked), e.g. run_report,notify_customer")
     i.add_argument("--force", action="store_true")
     i.set_defaults(fn=cmd_init)
 

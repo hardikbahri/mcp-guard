@@ -1,5 +1,9 @@
 # Policy reference (mcp-guard.yaml)
 
+The policy is the security boundary: keep it in version control behind review, read-only for the process that runs
+the agent, and validate it with `mcp-guard check` (in CI too). It is data, loaded with a safe YAML parser, so it
+cannot run code. Generate a starting point with `mcp-guard init --upstream "<server>"`.
+
 Default deny: a tool missing from `tools`, or not granted to the caller through `roles`, is hidden and blocked.
 
 ```yaml
