@@ -1,5 +1,7 @@
 # MCP Guard
 
+[![CI](https://github.com/hardikbahri/mcp-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/hardikbahri/mcp-guard/actions/workflows/ci.yml)
+
 Inline security gateway for AI agents and MCP tool servers. It sits between an agent and its tools and checks every
 tool listing, call and result, then **allows, alerts, redacts, blocks or terminates** by policy.
 
@@ -38,6 +40,10 @@ docker build -t mcp-guard . && docker run -p 8080:8080 mcp-guard
 # tests and the attack suite
 pytest && python attacks/evaluate.py
 ```
+
+With `MCP_GUARD_JWT_SECRET` set, the API takes the user from the token's `sub` (claimed roles are kept only where the policy grants them), a session can only be used with a token for the same user, and `/v1/audit` needs a token with the `audit` scope.
+
+CI runs the unit, API, proxy and attack-suite tests on Python 3.11 and 3.12, then builds the Docker image and checks that the container serves the API as a non-root user and blocks an out-of-role call.
 
 With ComplaintOps: `ComplaintAgent(server_module="mcp_guard.proxy")` with `MCP_GUARD_UPSTREAM="python -m complaintops.mcp_server"`.
 In tests, a poisoned similar-complaint result reaches the agent's LLM without the gateway; through it, the planted

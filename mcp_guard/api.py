@@ -3,9 +3,10 @@ developer agent's hook). The caller asks before forwarding a tool call and again
 
     uvicorn mcp_guard.api:app --port 8080
 
-Identity: when MCP_GUARD_JWT_SECRET is set, opening a session needs `Authorization: Bearer <JWT>` (HS256) and the user
-is the token's `sub`; roles claimed in the token are kept only where the policy grants them to that user. Without the
-secret (local development) the user is taken from the request body.
+Identity: when MCP_GUARD_JWT_SECRET is set, every call needs `Authorization: Bearer <JWT>` (HS256). Opening a session
+makes the token's `sub` the user; roles claimed in the token are kept only where the policy grants them to that user.
+Later calls on a session must carry a token for the same user, and reading the audit log needs a token whose `scope`
+includes `audit`. Without the secret (local development) the user is taken from the request body and nothing is checked.
 """
 import os
 from pathlib import Path
@@ -44,12 +45,11 @@ class ToolResult(BaseModel):
     result: Any
 
 
-def _identity(authorization: str | None, body_user: str | None) -> tuple[str, list[str] | None]:
+def _claims(authorization: str | None) -> dict | None:
+    """Decoded token, or None when JWT identity is switched off (no MCP_GUARD_JWT_SECRET)."""
     secret = os.environ.get("MCP_GUARD_JWT_SECRET")
     if not secret:
-        if not body_user:
-            raise HTTPException(400, "user is required")
-        return body_user, None
+        return None
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "bearer token required")
     try:
@@ -57,13 +57,28 @@ def _identity(authorization: str | None, body_user: str | None) -> tuple[str, li
                             audience=os.environ.get("MCP_GUARD_JWT_AUDIENCE", "mcp-guard"))
     except jwt.PyJWTError as e:
         raise HTTPException(401, f"invalid token: {e}") from e
+    if not claims.get("sub"):
+        raise HTTPException(401, "token has no sub")
+    return claims
+
+
+def _identity(authorization: str | None, body_user: str | None) -> tuple[str, list[str] | None]:
+    claims = _claims(authorization)
+    if claims is None:
+        if not body_user:
+            raise HTTPException(400, "user is required")
+        return body_user, None
     return claims["sub"], claims.get("roles")
 
 
-def _session(sid: str) -> Session:
+def _session(sid: str, authorization: str | None) -> Session:
     if sid not in sessions:
         raise HTTPException(404, "unknown session")
-    return sessions[sid]
+    s = sessions[sid]
+    claims = _claims(authorization)
+    if claims is not None and claims["sub"] != s.user:
+        raise HTTPException(403, "session belongs to another user")
+    return s
 
 
 def _out(d: Decision) -> dict:
@@ -86,20 +101,23 @@ def open_session(body: OpenSession, authorization: str | None = Header(default=N
 
 
 @app.post("/v1/sessions/{sid}/tools")
-def filter_tools(sid: str, body: ToolList):
-    return {"tools": guard.visible_tools(_session(sid), body.tools)}
+def filter_tools(sid: str, body: ToolList, authorization: str | None = Header(default=None)):
+    return {"tools": guard.visible_tools(_session(sid, authorization), body.tools)}
 
 
 @app.post("/v1/sessions/{sid}/check-call")
-def check_call(sid: str, body: ToolCall):
-    return _out(guard.check_call(_session(sid), body.tool, body.arguments))
+def check_call(sid: str, body: ToolCall, authorization: str | None = Header(default=None)):
+    return _out(guard.check_call(_session(sid, authorization), body.tool, body.arguments))
 
 
 @app.post("/v1/sessions/{sid}/check-result")
-def check_result(sid: str, body: ToolResult):
-    return _out(guard.check_result(_session(sid), body.tool, body.result))
+def check_result(sid: str, body: ToolResult, authorization: str | None = Header(default=None)):
+    return _out(guard.check_result(_session(sid, authorization), body.tool, body.result))
 
 
 @app.get("/v1/audit")
-def audit(limit: int = 50):
-    return {"events": list(guard.audit.recent)[-limit:]}
+def audit(limit: int = 50, authorization: str | None = Header(default=None)):
+    claims = _claims(authorization)
+    if claims is not None and "audit" not in str(claims.get("scope", "")).split():
+        raise HTTPException(403, "audit scope required")
+    return {"events": list(guard.audit.recent)[-max(1, min(limit, 1000)):]}
