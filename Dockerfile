@@ -1,8 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY mcp_guard ./mcp_guard
-COPY demo ./demo
 COPY policies ./policies
 RUN pip install --no-cache-dir . && useradd --create-home guard && mkdir -p /var/log/mcp-guard && chown guard /var/log/mcp-guard
 USER guard
