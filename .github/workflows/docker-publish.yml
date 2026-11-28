@@ -1,10 +1,9 @@
 name: Docker image
 
-# Publishes ghcr.io/hardikbahri/mcp-guard: `latest` from main, and a version tag for each vX.Y.Z tag.
+# Publishes ghcr.io/hardikbahri/mcp-guard:latest from main. Versioned images come from the Release workflow.
 on:
   push:
     branches: [main]
-    tags: ["v*"]
 
 permissions:
   contents: read
@@ -26,7 +25,6 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/mcp-guard
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
           labels: |
             org.opencontainers.image.title=MCP Guard
             org.opencontainers.image.description=Security gateway for AI agents and MCP tool servers

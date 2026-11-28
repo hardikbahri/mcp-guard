@@ -1,10 +1,14 @@
 name: Release
 
-# Pushing a version tag (vX.Y.Z) builds the package, uploads it to PyPI as mcp-guard-gateway and creates the
-# GitHub release. Uses PyPI trusted publishing: no API token is stored in the repo.
+# Run from the Actions tab (Run workflow) with the version in pyproject.toml, e.g. 0.2.0. It builds the package,
+# uploads it to PyPI as mcp-guard-gateway (trusted publishing: no stored token), pushes the versioned Docker image,
+# and creates the GitHub release and tag vX.Y.Z.
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (must match pyproject.toml)"
+        required: true
 
 jobs:
   build:
@@ -14,10 +18,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Version in pyproject.toml matches the release tag
+      - name: Version matches pyproject.toml
         run: |
           v=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          test "v$v" = "${GITHUB_REF_NAME}" || { echo "pyproject version v$v != tag ${GITHUB_REF_NAME}"; exit 1; }
+          test "$v" = "${{ inputs.version }}" || { echo "pyproject version $v != requested ${{ inputs.version }}"; exit 1; }
       - run: pip install build && python -m build
       - uses: actions/upload-artifact@v4
         with:
@@ -37,8 +41,31 @@ jobs:
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/mcp-guard:${{ inputs.version }}
+          labels: |
+            org.opencontainers.image.title=MCP Guard
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
   github-release:
-    needs: pypi
+    needs: [pypi, docker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -49,13 +76,19 @@ jobs:
           path: dist/
       - uses: softprops/action-gh-release@v2
         with:
-          name: MCP Guard ${{ github.ref_name }}
+          tag_name: v${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: MCP Guard v${{ inputs.version }}
           files: dist/*
           body: |
             Security gateway for AI agents and MCP tool servers.
 
-            **Install:** `pip install mcp-guard-gateway` or `docker pull ghcr.io/hardikbahri/mcp-guard:${{ github.ref_name }}`
+            **Install:** `pip install mcp-guard-gateway==${{ inputs.version }}` or `docker pull ghcr.io/hardikbahri/mcp-guard:${{ inputs.version }}`
 
             **Quickstart:** `mcp-guard init --upstream "<your MCP server>"`, review `mcp-guard.yaml`
             ([policy reference](https://github.com/hardikbahri/mcp-guard/blob/main/docs/policy.md)), `mcp-guard check`,
             then point your MCP client at `mcp-guard proxy`.
+
+            Includes: RBAC tool access, prompt-injection detection, argument contracts, call budgets, PII and secret
+            redaction, tool pinning, ECS audit log (OWASP Top 10 for Agentic Applications); Docker sandbox for local
+            servers; Streamable HTTP on both sides with JWT identity; `mcp-guard init` / `check` / `pin`; agent skill.
