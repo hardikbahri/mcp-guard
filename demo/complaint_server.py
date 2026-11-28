@@ -5,6 +5,7 @@ should never get: `notify_customer` (sends email outside the company) and `run_r
 
     DEMO_POISON=1               search results carry a planted instruction and personal data (indirect injection)
     DEMO_POISON_DESCRIPTION=1   classify_complaint's description hides instructions for the model (tool poisoning)
+    DEMO_HTTP_PORT=8765         serve over Streamable HTTP at http://127.0.0.1:8765/mcp instead of stdio (a "remote" server)
 
     python -m demo.complaint_server
 """
@@ -65,4 +66,7 @@ def run_report(query: str) -> dict:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    if os.environ.get("DEMO_HTTP_PORT"):
+        mcp.run("streamable-http", host="127.0.0.1", port=int(os.environ["DEMO_HTTP_PORT"]))
+    else:
+        mcp.run()

@@ -27,7 +27,11 @@ def main():
     p = argparse.ArgumentParser(prog="mcp-guard")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("pin", help="fingerprint every tool of an MCP server").add_argument("upstream")
-    sub.add_parser("proxy", help="run the stdio gateway (configured by MCP_GUARD_* variables)")
+    px = sub.add_parser("proxy", help="run the gateway (configured by MCP_GUARD_* variables)")
+    px.add_argument("--http", action="store_true", help="serve agents over Streamable HTTP instead of stdio")
+    px.add_argument("--host", default="127.0.0.1")
+    px.add_argument("--port", type=int, default=8090)
+    px.add_argument("--path", default="/mcp")
     api = sub.add_parser("api", help="run the HTTP policy decision point")
     api.add_argument("--port", type=int, default=8080)
     a = p.parse_args()
@@ -36,7 +40,7 @@ def main():
         anyio.run(_pin, a.upstream)
     elif a.cmd == "proxy":
         from mcp_guard.proxy import main as proxy_main
-        proxy_main()
+        proxy_main((["--http"] if a.http else []) + ["--host", a.host, "--port", str(a.port), "--path", a.path])
     else:
         import uvicorn
         uvicorn.run("mcp_guard.api:app", host="0.0.0.0", port=a.port)

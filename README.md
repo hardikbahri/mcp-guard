@@ -9,6 +9,9 @@ tool listing, call and result, then **allows, alerts, redacts, blocks or termina
 agent  <--MCP-->  mcp-guard (policy + detectors + audit)  <--MCP-->  tool server
 ```
 
+Either side can be **stdio** (local processes) or **Streamable HTTP** (remote): put it in front of a local server, a
+remote one, or serve a whole team's agents over HTTP.
+
 Built in front of the [ComplaintOps](https://github.com/hardikbahri/complaintops) triage agent.
 
 ## What it checks
@@ -34,6 +37,10 @@ Every decision is written as one JSON line with Elastic Common Schema fields (`@
 pip install -e ".[dev]"
 # stdio gateway: point any MCP client at this instead of the real server
 MCP_GUARD_UPSTREAM="python -m demo.complaint_server" MCP_GUARD_USER=triage-bot python -m mcp_guard.proxy
+# in front of a remote MCP server (Streamable HTTP)
+MCP_GUARD_UPSTREAM="https://tools.example.com/mcp" MCP_GUARD_UPSTREAM_TOKEN=... python -m mcp_guard.proxy
+# serve agents over HTTP at http://127.0.0.1:8090/mcp
+MCP_GUARD_UPSTREAM="python -m demo.complaint_server" MCP_GUARD_JWT_SECRET=... mcp-guard proxy --http --port 8090
 # HTTP policy decision point (FastAPI), optional JWT identity via MCP_GUARD_JWT_SECRET
 mcp-guard api --port 8080
 # Docker
@@ -44,11 +51,24 @@ pytest && python attacks/evaluate.py
 
 With `MCP_GUARD_JWT_SECRET` set, the API takes the user from the token's `sub` (claimed roles are kept only where the policy grants them), a session can only be used with a token for the same user, and `/v1/audit` needs a token with the `audit` scope.
 
-CI runs the unit, API, proxy and attack-suite tests on Python 3.11 and 3.12, then builds the Docker image and checks that the container serves the API as a non-root user and blocks an out-of-role call. A third job builds the sandbox image and runs the compromised-server demo against a real container.
+CI runs the unit, API, proxy (stdio and HTTP) and attack-suite tests on Python 3.11 and 3.12, then builds the Docker image and checks that the container serves the API as a non-root user and blocks an out-of-role call. A third job builds the sandbox image and runs the compromised-server demo against a real container.
 
 With ComplaintOps: `ComplaintAgent(server_module="mcp_guard.proxy")` with `MCP_GUARD_UPSTREAM="python -m complaintops.mcp_server"`.
 In tests, a poisoned similar-complaint result reaches the agent's LLM without the gateway; through it, the planted
 instruction and the personal data are removed.
+
+## Remote servers and HTTP agents
+
+**Remote upstream.** Set `MCP_GUARD_UPSTREAM` to a URL and the gateway connects over Streamable HTTP, with
+`MCP_GUARD_UPSTREAM_TOKEN` sent as a bearer token. A remote server runs on someone else's machine, so the risk shifts
+from host compromise to what you send it and what it sends back: the same DLP redaction (for tools marked
+`egress: external`), injection removal, RBAC and call budgets apply. The gateway refuses plain `http://` to anything
+but this machine, and `upstream_allowed_hosts: [tools.example.com]` in the policy pins where tool traffic may go.
+
+**HTTP downstream.** `mcp-guard proxy --http` serves MCP over Streamable HTTP. Each agent connection gets its own
+Guard session (call budget, violation count, termination). With `MCP_GUARD_JWT_SECRET` set, every request needs a
+bearer JWT and the user is its `sub`, so one gateway serves agents with different roles; a session cannot change
+user mid-way. The gateway refuses to listen beyond localhost without JWT identity.
 
 ## Sandbox
 

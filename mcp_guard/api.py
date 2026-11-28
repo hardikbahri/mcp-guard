@@ -12,10 +12,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-import jwt
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
+from mcp_guard import identity
 from mcp_guard import policy as policy_mod
 from mcp_guard.audit import AuditLog
 from mcp_guard.engine import Decision, Guard, Session
@@ -46,20 +46,10 @@ class ToolResult(BaseModel):
 
 
 def _claims(authorization: str | None) -> dict | None:
-    """Decoded token, or None when JWT identity is switched off (no MCP_GUARD_JWT_SECRET)."""
-    secret = os.environ.get("MCP_GUARD_JWT_SECRET")
-    if not secret:
-        return None
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(401, "bearer token required")
     try:
-        claims = jwt.decode(authorization.split(" ", 1)[1], secret, algorithms=["HS256"],
-                            audience=os.environ.get("MCP_GUARD_JWT_AUDIENCE", "mcp-guard"))
-    except jwt.PyJWTError as e:
-        raise HTTPException(401, f"invalid token: {e}") from e
-    if not claims.get("sub"):
-        raise HTTPException(401, "token has no sub")
-    return claims
+        return identity.claims(authorization)
+    except identity.AuthError as e:
+        raise HTTPException(e.status, str(e)) from e
 
 
 def _identity(authorization: str | None, body_user: str | None) -> tuple[str, list[str] | None]:
