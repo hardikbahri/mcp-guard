@@ -4,3 +4,5 @@ audit.jsonl
 .venv/
 .pytest_cache/
 demo/.rogue_write_probe
+build/
+*.egg-info/
